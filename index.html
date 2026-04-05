@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Friends of 10 Matching Game</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f4f0; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 1.5rem 1rem 3rem; }
+#game { width: 100%; max-width: 480px; text-align: center; }
+#title { font-size: 24px; font-weight: 600; color: #1a1a1a; margin-bottom: 2px; }
+#tagline { font-size: 13px; color: #666; margin-bottom: 0.8rem; }
+
+#level-bar { display: flex; gap: 8px; justify-content: center; margin-bottom: 0.5rem; }
+.lvl-pip { width: 36px; height: 10px; border-radius: 99px; transition: background 0.4s, border-color 0.4s; border: 1.5px solid #ccc; background: #e8e6e0; }
+
+#level-label { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+#level-pairs-hint { font-size: 12px; color: #888; margin-bottom: 0.7rem; }
+
+#stats { display: flex; gap: 10px; justify-content: center; margin-bottom: 0.8rem; }
+.stat { background: #ebe9e3; border-radius: 10px; padding: 6px 16px; }
+.stat-label { font-size: 11px; color: #888; }
+.stat-val { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+
+#grid { display: grid; gap: 10px; max-width: 440px; margin: 0 auto 0.8rem; }
+
+.card { cursor: pointer; perspective: 600px; }
+.card-inner { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.42s cubic-bezier(.4,0,.2,1); }
+.card.flipped .card-inner, .card.matched .card-inner { transform: rotateY(180deg); }
+
+@keyframes shuffleCard {
+  0%   { transform: translateY(0) scale(1) rotate(0deg); }
+  25%  { transform: translateY(-18px) scale(1.08) rotate(-4deg); }
+  50%  { transform: translateY(-10px) scale(1.04) rotate(3deg); }
+  75%  { transform: translateY(-6px) scale(1.02) rotate(-2deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); }
+}
+.card.shuffling { animation: shuffleCard 0.55s ease both; }
+
+.card-face { position: absolute; width: 100%; height: 100%; border-radius: 14px; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; border: 2.5px solid transparent; }
+.card-back { font-size: 22px; font-weight: 600; color: #fff; }
+.card-front { background: #fff; border-color: #d0cec8; transform: rotateY(180deg); }
+.card-num { font-weight: 600; color: #1a1a1a; line-height: 1; }
+.card.matched .card-face.card-front { background: #EAF3DE; border-color: #639922; }
+.card.matched .card-num { color: #27500A; }
+.card.wrong .card-face.card-front { background: #FCEBEB; border-color: #E24B4A; }
+.card.wrong .card-num { color: #A32D2D; }
+
+#message-box { min-height: 38px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.4rem; }
+#message { font-size: 17px; font-weight: 600; color: #1a1a1a; transition: opacity 0.25s; }
+
+#win-screen { display: none; padding: 1rem 0.5rem; }
+#trophy { font-size: 100px; line-height: 1; margin-bottom: 0.5rem; animation: popIn 0.6s cubic-bezier(.17,.67,.3,1.4) both; }
+@keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+#win-title { font-size: 26px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+#win-sub { font-size: 14px; color: #666; margin-bottom: 1rem; }
+#stars-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 1rem; font-size: 36px; }
+
+#btn-row { margin-top: 0.8rem; display: flex; gap: 10px; justify-content: center; }
+button { padding: 9px 24px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1.5px solid; }
+#next-btn { display: none; color: #fff; }
+#next-btn:hover { opacity: 0.88; }
+#restart-btn { background: #e8e6e0; color: #555; border-color: #ccc; }
+#restart-btn:hover { background: #dddbd5; }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="title">Friends of 10 Matching Game</div>
+  <div id="tagline">Find pairs that add up to 10!</div>
+
+  <div id="level-bar">
+    <div class="lvl-pip" id="pip-0"></div>
+    <div class="lvl-pip" id="pip-1"></div>
+    <div class="lvl-pip" id="pip-2"></div>
+  </div>
+  <div id="level-label"></div>
+  <div id="level-pairs-hint"></div>
+
+  <div id="stats">
+    <div class="stat"><div class="stat-label">Pairs found</div><div class="stat-val" id="pairs-stat">0</div></div>
+    <div class="stat"><div class="stat-label">Tries</div><div class="stat-val" id="tries-stat">0</div></div>
+  </div>
+
+  <div id="grid"></div>
+  <div id="message-box"><div id="message">Flip a card to start! ⭐</div></div>
+
+  <div id="win-screen">
+    <div id="trophy">🏆</div>
+    <div id="stars-row">⭐ ⭐ ⭐</div>
+    <div id="win-title">You did it! Amazing job!</div>
+    <div id="win-sub"></div>
+  </div>
+
+  <div id="btn-row">
+    <button id="next-btn">Next level →</button>
+    <button id="restart-btn">Restart</button>
+  </div>
+</div>
+
+<script>
+// Each level has its own unique, fixed set of pairs — no repeats within or across levels
+const LEVELS = [
+  {
+    label: 'Level 1 — 4 pairs',
+    pairs: [[8,2],[6,4],[5,5],[7,3]],
+    cols: 4, cardSize: 90,
+    back: '#378ADD', backBorder: '#185FA5',
+    pipActive: '#378ADD', labelColor: '#185FA5',
+    nextBg: '#378ADD', nextBorder: '#185FA5'
+  },
+  {
+    label: 'Level 2 — 6 pairs',
+    pairs: [[9,1],[4,6],[2,8],[0,10],[3,7],[5,5]],
+    cols: 4, cardSize: 86,
+    back: '#D85A30', backBorder: '#993C1D',
+    pipActive: '#D85A30', labelColor: '#993C1D',
+    nextBg: '#D85A30', nextBorder: '#993C1D'
+  },
+  {
+    label: 'Level 3 — 8 pairs',
+    pairs: [[1,9],[2,8],[3,7],[4,6],[5,5],[6,4],[7,3],[10,0]],
+    cols: 4, cardSize: 80,
+    back: '#7F77DD', backBorder: '#534AB7',
+    pipActive: '#7F77DD', labelColor: '#534AB7',
+    nextBg: '#7F77DD', nextBorder: '#534AB7'
+  }
+];
+
+let level = 0, flipped = [], matched = 0, tries = 0, locked = false, totalTries = 0;
+
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx = null;
+function getAC() { if (!actx) actx = new AudioCtx(); return actx; }
+function tone(freq, type, dur, vol, delay) {
+  vol = vol || 0.15; delay = delay || 0;
+  try {
+    var ac = getAC(), o = ac.createOscillator(), g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type = type; o.frequency.value = freq;
+    var t = ac.currentTime + delay;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur);
+  } catch(e) {}
+}
+function playFlip()    { tone(700,'sine',0.06,0.07,0); }
+function playMatch()   {
+  [[523,0],[659,0.1],[784,0.2],[1047,0.32]].forEach(function(fd){ tone(fd[0],'sine',0.18,0.2,fd[1]); });
+}
+function playWrong()   { tone(220,'sawtooth',0.1,0.15,0); tone(196,'sawtooth',0.1,0.15,0.12); }
+function playShuffle() {
+  [300,400,350,500,420].forEach(function(f,i){ tone(f,'sine',0.07,0.08,i*0.07); });
+}
+function playBigCheer() {
+  [[523,0],[659,0.1],[784,0.2],[1047,0.32],[1319,0.46],
+   [1047,0.58],[1319,0.68],[1568,0.8],[1319,0.94],[1568,1.06],[2093,1.2]]
+    .forEach(function(fd){ tone(fd[0],'sine',0.3,0.22,fd[1]); });
+  [261,329,392,523].forEach(function(f,i){ tone(f,'triangle',1.4,0.1,i*0.08); });
+}
+
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i=a.length-1;i>0;i--) {
+    var j = Math.floor(Math.random()*(i+1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function setMessage(txt) {
+  var m = document.getElementById('message');
+  m.style.opacity = 0;
+  setTimeout(function(){ m.textContent = txt; m.style.opacity = 1; }, 150);
+}
+
+function updateStats() {
+  document.getElementById('pairs-stat').textContent = matched + ' / ' + LEVELS[level].pairs.length;
+  document.getElementById('tries-stat').textContent = tries;
+}
+
+function updateLevelUI() {
+  var cfg = LEVELS[level];
+  document.getElementById('level-label').textContent = cfg.label;
+  document.getElementById('level-label').style.color = cfg.labelColor;
+
+  var hint = cfg.pairs.map(function(p){ return p[0]+'+'+p[1]; }).join('  ·  ');
+  document.getElementById('level-pairs-hint').textContent = 'Pairs: ' + hint;
+
+  for (var i=0;i<3;i++) {
+    var pip = document.getElementById('pip-'+i);
+    if (i < level)        { pip.style.background='#639922'; pip.style.borderColor='#3B6D11'; }
+    else if (i === level) { pip.style.background=cfg.pipActive; pip.style.borderColor=cfg.backBorder; }
+    else                  { pip.style.background='#e8e6e0'; pip.style.borderColor='#ccc'; }
+  }
+  var nb = document.getElementById('next-btn');
+  nb.style.background = cfg.nextBg;
+  nb.style.borderColor = cfg.nextBorder;
+}
+
+function getShuffledVals() {
+  var cfg = LEVELS[level];
+  var vals = [];
+  cfg.pairs.forEach(function(p){ vals.push(p[0]); vals.push(p[1]); });
+  return shuffle(vals);
+}
+
+function buildCardElements(vals) {
+  var cfg = LEVELS[level];
+  var grid = document.getElementById('grid');
+  grid.style.gridTemplateColumns = 'repeat('+cfg.cols+', 1fr)';
+  grid.innerHTML = '';
+
+  vals.forEach(function(num) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.val = num;
+    card.style.height = cfg.cardSize + 'px';
+
+    var inner = document.createElement('div');
+    inner.className = 'card-inner';
+    inner.style.height = cfg.cardSize + 'px';
+
+    var back = document.createElement('div');
+    back.className = 'card-face card-back';
+    back.style.background = cfg.back;
+    back.style.borderColor = cfg.backBorder;
+    back.textContent = '?';
+
+    var front = document.createElement('div');
+    front.className = 'card-face card-front';
+    var numDiv = document.createElement('div');
+    numDiv.className = 'card-num';
+    numDiv.style.fontSize = cfg.cardSize >= 86 ? '36px' : '30px';
+    numDiv.textContent = num;
+    front.appendChild(numDiv);
+
+    inner.appendChild(back);
+    inner.appendChild(front);
+    card.appendChild(inner);
+    card.addEventListener('click', function(){ onFlip(card); });
+    grid.appendChild(card);
+  });
+}
+
+function renderWithShuffle(animate) {
+  if (!animate) {
+    buildCardElements(getShuffledVals());
+    return;
+  }
+  buildCardElements(getShuffledVals());
+  locked = true;
+  playShuffle();
+
+  var cards = document.querySelectorAll('.card');
+  cards.forEach(function(c, i) {
+    c.style.animationDelay = (i * 0.04) + 's';
+    c.classList.add('shuffling');
+  });
+
+  setTimeout(function() {
+    buildCardElements(getShuffledVals());
+    locked = false;
+    setMessage('Flip a card to start! ⭐');
+  }, cards.length * 40 + 620);
+}
+
+function onFlip(card) {
+  if (locked || card.classList.contains('flipped') || card.classList.contains('matched') || flipped.length >= 2) return;
+  playFlip();
+  card.classList.add('flipped');
+  flipped.push(card);
+
+  if (flipped.length === 2) {
+    locked = true; tries++; totalTries++; updateStats();
+    var a = parseInt(flipped[0].dataset.val);
+    var b = parseInt(flipped[1].dataset.val);
+
+    if (a + b === 10) {
+      setTimeout(function() {
+        flipped.forEach(function(c){ c.classList.remove('wrong'); c.classList.add('matched'); });
+        matched++; updateStats(); playMatch();
+        var left = LEVELS[level].pairs.length - matched;
+        if (matched === LEVELS[level].pairs.length) {
+          setTimeout(onLevelComplete, 600);
+        } else {
+          setMessage(left === 1 ? 'One more pair! 💫' : a+' + '+b+' = 10 ⭐ Keep going!');
+        }
+        flipped = []; locked = false;
+      }, 450);
+    } else {
+      flipped.forEach(function(c){ c.classList.add('wrong'); });
+      var msgs = ['Try again! 🙈','Oops! Keep looking! 💪','Not quite! 👀','Almost! Try another! 🔍'];
+      setMessage(msgs[Math.floor(Math.random() * msgs.length)]);
+      playWrong();
+      setTimeout(function() {
+        flipped.forEach(function(c){ c.classList.remove('flipped','wrong'); });
+        flipped = []; locked = false;
+        setMessage('Keep flipping! ⭐');
+      }, 1000);
+    }
+  }
+}
+
+function onLevelComplete() {
+  if (level === 2) { showWin(); return; }
+  playMatch();
+  setMessage('Level '+(level+1)+' complete! 🎉');
+  var nb = document.getElementById('next-btn');
+  nb.style.display = 'inline-block';
+  nb.textContent = 'Level '+(level+2)+' →';
+}
+
+function showWin() {
+  playBigCheer();
+  ['grid','message-box','stats','level-bar','level-label','level-pairs-hint','next-btn']
+    .forEach(function(id){ document.getElementById(id).style.display='none'; });
+  document.getElementById('win-screen').style.display = 'block';
+  document.getElementById('win-sub').textContent = 'All 3 levels cleared in '+totalTries+' tries!';
+  for (var i=0;i<3;i++) {
+    var pip = document.getElementById('pip-'+i);
+    pip.style.background='#639922'; pip.style.borderColor='#3B6D11';
+  }
+}
+
+function startLevel(animate) {
+  matched=0; tries=0; flipped=[]; locked=false;
+  updateStats(); updateLevelUI();
+  ['grid','message-box','stats','level-bar','level-label','level-pairs-hint']
+    .forEach(function(id){ document.getElementById(id).style.display=''; });
+  document.getElementById('win-screen').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+  if (!animate) setMessage('Flip a card to start! ⭐');
+  else setMessage('Shuffling cards... 🔀');
+  renderWithShuffle(animate);
+}
+
+document.getElementById('next-btn').addEventListener('click', function(){ level++; startLevel(false); });
+document.getElementById('restart-btn').addEventListener('click', function(){ level=0; totalTries=0; startLevel(true); });
+
+startLevel(false);
+</script>
+</body>
+</html>
